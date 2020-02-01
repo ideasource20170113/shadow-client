@@ -1,1 +1,1 @@
-# shadow-server
+# shadow-client
