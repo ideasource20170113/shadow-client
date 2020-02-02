@@ -13,7 +13,9 @@ import traceback
 import uuid
 import asyncio
 import zipfile
-
+import cv2
+import numpy
+from win32api import GetSystemMetrics
 import requests
 import socketio
 from mss import mss
@@ -35,6 +37,10 @@ coding = locale.getpreferredencoding()
 
 config_name = os.getenv('SHADOW_ENV', 'development')
 config = settings[config_name]
+
+# 调用api判断系统分辨率
+width = GetSystemMetrics(0)
+height = GetSystemMetrics(1)
 
 
 def get_server_ip():
@@ -79,9 +85,23 @@ class Agent(object):
     async def api_command(self, message_body):
         print('收到来自服务端的消息：')
         print(message_body)
-        room = message_body['room']
-        # result_cmd = 'root# ' + message_body['cmd']
         await self.handle(message_body)
+
+    async def api_monitor(self, message_body):
+        room = message_body['room']
+        with mss() as sct:
+            sct.compression_level = 0.1
+            monitor = {"left": 0, "top": 0, "width": width, "height": height}
+            while True:
+                img = numpy.array(sct.grab(monitor))
+                new_img = cv2.resize(img, (0, 0), fx=0.5, fy=0.5)
+                image = cv2.imencode('.jpg', new_img)[1]
+                image_code = str(base64.b64encode(image))[2:-1]
+                await sio.emit('monitor', {
+                    'room': room,
+                    'data': image_code
+                }, namespace='/api')
+                await asyncio.sleep(0.1)
 
     # 命令处理器
     async def handle(self, message):
@@ -380,6 +400,7 @@ class Agent(object):
         sio.on('hello', self.api_hello, namespace='/api')
         sio.on('connect', self.api_connect, namespace='/api')
         sio.on('command', self.api_command, namespace='/api')
+        sio.on('monitor', self.api_monitor, namespace='/api')
         while True:
             try:
                 await sio.connect(get_server_ip())
