@@ -44,9 +44,12 @@ height = GetSystemMetrics(1)
 
 
 def get_server_ip():
-    if config_name != 'development':
+    ip_env = 'test'
+    if ip_env == 'production':
         resp = requests.get('http://118.25.213.50:8000/ip')
         return resp.content.decode()
+    if ip_env == 'test':
+        return 'ws://192.168.123.37:5000'
     else:
         return 'ws://localhost:5000'
 
@@ -101,7 +104,7 @@ class Agent(object):
                     'room': room,
                     'data': image_code
                 }, namespace='/api')
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.3)
 
     # 命令处理器
     async def handle(self, message):
